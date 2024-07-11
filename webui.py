@@ -1,10 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 '''
-@Project ：EchoMimic
-@File    ：audio2vid.py
-@Author  ：juzhen.czy
-@Date    ：2024/3/4 17:43 
+webui
 '''
 
 import os
@@ -50,7 +47,8 @@ def select_face(det_bboxes, probs):
     sorted_bboxes = sorted(filtered_bboxes, key=lambda x:(x[3]-x[1]) * (x[2] - x[0]), reverse=True)
     return sorted_bboxes[0]
 
-def process_video(uploaded_img, uploaded_audio, config_path, width, height, length, seed, facemask_dilation_ratio, facecrop_dilation_ratio, context_frames, context_overlap, cfg, steps, sample_rate, fps, device):
+def process_video(uploaded_img, uploaded_audio, width, height, length, seed, facemask_dilation_ratio, facecrop_dilation_ratio, context_frames, context_overlap, cfg, steps, sample_rate, fps, device):
+    config_path = "./configs/prompts/animation.yaml"
     config = OmegaConf.load(config_path)
     if config.weight_dtype == "fp16":
         weight_dtype = torch.float16
@@ -182,8 +180,7 @@ def process_video(uploaded_img, uploaded_audio, config_path, width, height, leng
     video_clip.write_videofile(str(final_output_path), codec="libx264", audio_codec="aac")
 
     return final_output_path
-
-default_config_path = "./configs/prompts/animation.yaml"
+  
 default_values = {
     "width": 512,
     "height": 512,
@@ -201,51 +198,56 @@ default_values = {
 }
 
 with gr.Blocks() as demo:
-    config_path = gr.Textbox(label="Config Path", value=default_config_path)
-    width = gr.Slider(label="Width", minimum=128, maximum=1024, value=default_values["width"])
-    height = gr.Slider(label="Height", minimum=128, maximum=1024, value=default_values["height"])
-    length = gr.Slider(label="Length", minimum=100, maximum=5000, value=default_values["length"])
-    seed = gr.Slider(label="Seed", minimum=0, maximum=10000, value=default_values["seed"])
-    facemask_dilation_ratio = gr.Slider(label="Facemask Dilation Ratio", minimum=0.0, maximum=1.0, step=0.01, value=default_values["facemask_dilation_ratio"])
-    facecrop_dilation_ratio = gr.Slider(label="Facecrop Dilation Ratio", minimum=0.0, maximum=1.0, step=0.01, value=default_values["facecrop_dilation_ratio"])
-    context_frames = gr.Slider(label="Context Frames", minimum=0, maximum=50, step=1, value=default_values["context_frames"])
-    context_overlap = gr.Slider(label="Context Overlap", minimum=0, maximum=10, step=1, value=default_values["context_overlap"])
-    cfg = gr.Slider(label="CFG", minimum=0.0, maximum=10.0, step=0.1, value=default_values["cfg"])
-    steps = gr.Slider(label="Steps", minimum=1, maximum=100, step=1, value=default_values["steps"])
-    sample_rate = gr.Slider(label="Sample Rate", minimum=8000, maximum=48000, step=1000, value=default_values["sample_rate"])
-    fps = gr.Slider(label="FPS", minimum=1, maximum=60, step=1, value=default_values["fps"])
-    device = gr.Radio(label="Device", choices=["cuda", "cpu"], value=default_values["device"])
+    with gr.Row():
+        with gr.Column():
+            uploaded_img = gr.Image(type="file", label="Reference Image")
+            uploaded_audio = gr.Audio(type="file", label="Input Audio")
+        with gr.Column():
+            output_video = gr.Video()
 
-    uploaded_img = gr.Image(type="file", label="Reference Image")
-    uploaded_audio = gr.Audio(type="file", label="Input Audio")
+    with gr.Accordion("Configuration", open=False):
+        width = gr.Slider(label="Width", minimum=128, maximum=1024, value=default_values["width"])
+        height = gr.Slider(label="Height", minimum=128, maximum=1024, value=default_values["height"])
+        length = gr.Slider(label="Length", minimum=100, maximum=5000, value=default_values["length"])
+        seed = gr.Slider(label="Seed", minimum=0, maximum=10000, value=default_values["seed"])
+        facemask_dilation_ratio = gr.Slider(label="Facemask Dilation Ratio", minimum=0.0, maximum=1.0, step=0.01, value=default_values["facemask_dilation_ratio"])
+        facecrop_dilation_ratio = gr.Slider(label="Facecrop Dilation Ratio", minimum=0.0, maximum=1.0, step=0.01, value=default_values["facecrop_dilation_ratio"])
+        context_frames = gr.Slider(label="Context Frames", minimum=0, maximum=50, step=1, value=default_values["context_frames"])
+        context_overlap = gr.Slider(label="Context Overlap", minimum=0, maximum=10, step=1, value=default_values["context_overlap"])
+        cfg = gr.Slider(label="CFG", minimum=0.0, maximum=10.0, step=0.1, value=default_values["cfg"])
+        steps = gr.Slider(label="Steps", minimum=1, maximum=100, step=1, value=default_values["steps"])
+        sample_rate = gr.Slider(label="Sample Rate", minimum=8000, maximum=48000, step=1000, value=default_values["sample_rate"])
+        fps = gr.Slider(label="FPS", minimum=1, maximum=60, step=1, value=default_values["fps"])
+        device = gr.Radio(label="Device", choices=["cuda", "cpu"], value=default_values["device"])
 
-    output_video = gr.Video()
-    download_button = gr.Button("Download Video")
+    generate_button = gr.Button("Generate Video")
 
-    upload_inputs = [
-        uploaded_img,
-        uploaded_audio,
-        config_path,
-        width,
-        height,
-        length,
-        seed,
-        facemask_dilation_ratio,
-        facecrop_dilation_ratio,
-        context_frames,
-        context_overlap,
-        cfg,
-        steps,
-        sample_rate,
-        fps,
-        device
-    ]
+    def generate_video(uploaded_img, uploaded_audio, width, height, length, seed, facemask_dilation_ratio, facecrop_dilation_ratio, context_frames, context_overlap, cfg, steps, sample_rate, fps, device):
+        final_output_path = process_video(
+            uploaded_img, uploaded_audio, width, height, length, seed, facemask_dilation_ratio, facecrop_dilation_ratio, context_frames, context_overlap, cfg, steps, sample_rate, fps, device
+        )
+        return final_output_path
 
-    demo_file = gr.Interface(
-        fn=process_video,
-        inputs=upload_inputs,
-        outputs=output_video,
-        live=True
+    generate_button.click(
+        generate_video,
+        inputs=[
+            uploaded_img,
+            uploaded_audio,
+            width,
+            height,
+            length,
+            seed,
+            facemask_dilation_ratio,
+            facecrop_dilation_ratio,
+            context_frames,
+            context_overlap,
+            cfg,
+            steps,
+            sample_rate,
+            fps,
+            device
+        ],
+        outputs=output_video
     )
 
-    demo_file.launch()
+demo.launch(inbrowser=True)
