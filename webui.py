@@ -201,8 +201,8 @@ def process_video(uploaded_img, uploaded_audio, width, height, length, seed, fac
     return final_output_path
   
 with gr.Blocks() as demo:
-    gr.Markdown('# EchoMimic')
-    gr.Markdown('![]()')
+    gr.Markdown('# EchoMimic WebUI')
+
     with gr.Row():
         with gr.Column():
             uploaded_img = gr.Image(type="filepath", label="Reference Image")
