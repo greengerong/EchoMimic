@@ -4,7 +4,7 @@
 
 # Install dependencies
 echo "Installing dependencies..."
-pip install -r requirements.txt -U
+pip install -r requirements.txt
 
 # Set environment variable for FFMPEG_PATH
 export FFMPEG_PATH="$(pwd)/ffmpeg-4.4-amd64-static"
