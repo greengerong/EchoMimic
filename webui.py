@@ -26,12 +26,102 @@ from facenet_pytorch import MTCNN
 
 import gradio as gr
 
+default_values = {
+    "width": 512,
+    "height": 512,
+    "length": 1200,
+    "seed": 420,
+    "facemask_dilation_ratio": 0.1,
+    "facecrop_dilation_ratio": 0.5,
+    "context_frames": 12,
+    "context_overlap": 3,
+    "cfg": 2.5,
+    "steps": 30,
+    "sample_rate": 16000,
+    "fps": 24,
+    "device": "cuda"
+}
+
 ffmpeg_path = os.getenv('FFMPEG_PATH')
 if ffmpeg_path is None:
     print("please download ffmpeg-static and export to FFMPEG_PATH. \nFor example: export FFMPEG_PATH=/musetalk/ffmpeg-4.4-amd64-static")
 elif ffmpeg_path not in os.getenv('PATH'):
     print("add ffmpeg to path")
     os.environ["PATH"] = f"{ffmpeg_path}:{os.environ['PATH']}"
+
+
+config_path = "./configs/prompts/animation.yaml"
+config = OmegaConf.load(config_path)
+if config.weight_dtype == "fp16":
+    weight_dtype = torch.float16
+else:
+    weight_dtype = torch.float32
+
+device = "cuda"
+if not torch.cuda.is_available():
+    device = "cpu"
+
+inference_config_path = config.inference_config
+infer_config = OmegaConf.load(inference_config_path)
+
+############# model_init started #############
+## vae init
+vae = AutoencoderKL.from_pretrained(config.pretrained_vae_path).to("cuda", dtype=weight_dtype)
+
+## reference net init
+reference_unet = UNet2DConditionModel.from_pretrained(
+    config.pretrained_base_model_path,
+    subfolder="unet",
+).to(dtype=weight_dtype, device=device)
+reference_unet.load_state_dict(torch.load(config.reference_unet_path, map_location="cpu"))
+
+## denoising net init
+if os.path.exists(config.motion_module_path):
+    ### stage1 + stage2
+    denoising_unet = EchoUNet3DConditionModel.from_pretrained_2d(
+        config.pretrained_base_model_path,
+        config.motion_module_path,
+        subfolder="unet",
+        unet_additional_kwargs=infer_config.unet_additional_kwargs,
+    ).to(dtype=weight_dtype, device=device)
+else:
+    ### only stage1
+    denoising_unet = EchoUNet3DConditionModel.from_pretrained_2d(
+        config.pretrained_base_model_path,
+        "",
+        subfolder="unet",
+        unet_additional_kwargs={
+            "use_motion_module": False,
+            "unet_use_temporal_attention": False,
+            "cross_attention_dim": infer_config.unet_additional_kwargs.cross_attention_dim
+        }
+    ).to(dtype=weight_dtype, device=device)
+
+denoising_unet.load_state_dict(torch.load(config.denoising_unet_path, map_location="cpu"), strict=False)
+
+## face locator init
+face_locator = FaceLocator(320, conditioning_channels=1, block_out_channels=(16, 32, 96, 256)).to(dtype=weight_dtype, device="cuda")
+face_locator.load_state_dict(torch.load(config.face_locator_path))
+
+## load audio processor params
+audio_processor = load_audio_model(model_path=config.audio_model_path, device=device)
+
+## load face detector params
+face_detector = MTCNN(image_size=320, margin=0, min_face_size=20, thresholds=[0.6, 0.7, 0.7], factor=0.709, post_process=True, device=device)
+
+############# model_init finished #############
+
+sched_kwargs = OmegaConf.to_container(infer_config.noise_scheduler_kwargs)
+scheduler = DDIMScheduler(**sched_kwargs)
+
+pipe = Audio2VideoPipeline(
+    vae=vae,
+    reference_unet=reference_unet,
+    denoising_unet=denoising_unet,
+    audio_guider=audio_processor,
+    face_locator=face_locator,
+    scheduler=scheduler,
+).to("cuda", dtype=weight_dtype)
 
 def select_face(det_bboxes, probs):
     ## max face from faces that the prob is above 0.8
@@ -48,77 +138,6 @@ def select_face(det_bboxes, probs):
     return sorted_bboxes[0]
 
 def process_video(uploaded_img, uploaded_audio, width, height, length, seed, facemask_dilation_ratio, facecrop_dilation_ratio, context_frames, context_overlap, cfg, steps, sample_rate, fps, device):
-    config_path = "./configs/prompts/animation.yaml"
-    config = OmegaConf.load(config_path)
-    if config.weight_dtype == "fp16":
-        weight_dtype = torch.float16
-    else:
-        weight_dtype = torch.float32
-
-    if device.__contains__("cuda") and not torch.cuda.is_available():
-        device = "cpu"
-
-    inference_config_path = config.inference_config
-    infer_config = OmegaConf.load(inference_config_path)
-
-    ############# model_init started #############
-    ## vae init
-    vae = AutoencoderKL.from_pretrained(config.pretrained_vae_path).to("cuda", dtype=weight_dtype)
-    
-    ## reference net init
-    reference_unet = UNet2DConditionModel.from_pretrained(
-        config.pretrained_base_model_path,
-        subfolder="unet",
-    ).to(dtype=weight_dtype, device=device)
-    reference_unet.load_state_dict(torch.load(config.reference_unet_path, map_location="cpu"))
-
-    ## denoising net init
-    if os.path.exists(config.motion_module_path):
-        ### stage1 + stage2
-        denoising_unet = EchoUNet3DConditionModel.from_pretrained_2d(
-            config.pretrained_base_model_path,
-            config.motion_module_path,
-            subfolder="unet",
-            unet_additional_kwargs=infer_config.unet_additional_kwargs,
-        ).to(dtype=weight_dtype, device=device)
-    else:
-        ### only stage1
-        denoising_unet = EchoUNet3DConditionModel.from_pretrained_2d(
-            config.pretrained_base_model_path,
-            "",
-            subfolder="unet",
-            unet_additional_kwargs={
-                "use_motion_module": False,
-                "unet_use_temporal_attention": False,
-                "cross_attention_dim": infer_config.unet_additional_kwargs.cross_attention_dim
-            }
-        ).to(dtype=weight_dtype, device=device)
-
-    denoising_unet.load_state_dict(torch.load(config.denoising_unet_path, map_location="cpu"), strict=False)
-
-    ## face locator init
-    face_locator = FaceLocator(320, conditioning_channels=1, block_out_channels=(16, 32, 96, 256)).to(dtype=weight_dtype, device="cuda")
-    face_locator.load_state_dict(torch.load(config.face_locator_path))
-    
-    ## load audio processor params
-    audio_processor = load_audio_model(model_path=config.audio_model_path, device=device)
-
-    ## load face detector params
-    face_detector = MTCNN(image_size=320, margin=0, min_face_size=20, thresholds=[0.6, 0.7, 0.7], factor=0.709, post_process=True, device=device)
-
-    ############# model_init finished #############
-
-    sched_kwargs = OmegaConf.to_container(infer_config.noise_scheduler_kwargs)
-    scheduler = DDIMScheduler(**sched_kwargs)
-
-    pipe = Audio2VideoPipeline(
-        vae=vae,
-        reference_unet=reference_unet,
-        denoising_unet=denoising_unet,
-        audio_guider=audio_processor,
-        face_locator=face_locator,
-        scheduler=scheduler,
-    ).to("cuda", dtype=weight_dtype)
 
     if seed is not None and seed > -1:
         generator = torch.manual_seed(seed)
@@ -181,23 +200,9 @@ def process_video(uploaded_img, uploaded_audio, width, height, length, seed, fac
 
     return final_output_path
   
-default_values = {
-    "width": 512,
-    "height": 512,
-    "length": 1200,
-    "seed": 420,
-    "facemask_dilation_ratio": 0.1,
-    "facecrop_dilation_ratio": 0.5,
-    "context_frames": 12,
-    "context_overlap": 3,
-    "cfg": 2.5,
-    "steps": 30,
-    "sample_rate": 16000,
-    "fps": 24,
-    "device": "cuda"
-}
-
 with gr.Blocks() as demo:
+    gr.Markdown('# EchoMimic')
+    gr.Markdown('![]()')
     with gr.Row():
         with gr.Column():
             uploaded_img = gr.Image(type="filepath", label="Reference Image")
