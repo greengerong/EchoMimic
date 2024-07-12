@@ -12,3 +12,6 @@ export PATH=$FFMPEG_PATH:$PATH
 
 echo "FFMPEG_PATH is set to $FFMPEG_PATH"
 echo "Environment setup complete. You can now run your application."
+
+# 服务启动
+python -u webui.py
