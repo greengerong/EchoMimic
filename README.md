@@ -183,6 +183,13 @@ Run the python inference script:
   python -u infer_audio2vid.py
 ```
 
+### Audio-Drived WebUI 
+Run the python inference script:
+
+```bash
+  python -u webui.py
+```
+
 ### Audio-Drived Algo Inference On Your Own Cases 
 
 Edit the inference config file **./configs/prompts/animation.yaml**, and add your own case:
