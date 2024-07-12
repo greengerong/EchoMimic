@@ -126,7 +126,7 @@ def process_video(uploaded_img, uploaded_audio, width, height, length, seed, fac
         generator = torch.manual_seed(random.randint(100, 1000000))
 
     #### face musk prepare
-    face_img = cv2.imread(uploaded_img.name)
+    face_img = cv2.imread(uploaded_img)
     face_mask = np.zeros((face_img.shape[0], face_img.shape[1])).astype('uint8')
     det_bboxes, probs = face_detector.detect(face_img)
     select_bbox = select_face(det_bboxes, probs)
@@ -154,7 +154,7 @@ def process_video(uploaded_img, uploaded_audio, width, height, length, seed, fac
     
     video = pipe(
         ref_image_pil,
-        uploaded_audio.name,
+        uploaded_audio,
         face_mask_tensor,
         width,
         height,
@@ -174,7 +174,7 @@ def process_video(uploaded_img, uploaded_audio, width, height, length, seed, fac
     save_videos_grid(video, str(output_video_path), n_rows=1, fps=fps)
 
     video_clip = VideoFileClip(str(output_video_path))
-    audio_clip = AudioFileClip(uploaded_audio.name)
+    audio_clip = AudioFileClip(uploaded_audio)
     final_output_path = save_dir / "output_video_with_audio.mp4"
     video_clip = video_clip.set_audio(audio_clip)
     video_clip.write_videofile(str(final_output_path), codec="libx264", audio_codec="aac")
@@ -200,8 +200,8 @@ default_values = {
 with gr.Blocks() as demo:
     with gr.Row():
         with gr.Column():
-            uploaded_img = gr.Image(type="file", label="Reference Image")
-            uploaded_audio = gr.Audio(type="file", label="Input Audio")
+            uploaded_img = gr.Image(type="filepath", label="Reference Image")
+            uploaded_audio = gr.Audio(type="filepath", label="Input Audio")
         with gr.Column():
             output_video = gr.Video()
 
@@ -223,9 +223,11 @@ with gr.Blocks() as demo:
     generate_button = gr.Button("Generate Video")
 
     def generate_video(uploaded_img, uploaded_audio, width, height, length, seed, facemask_dilation_ratio, facecrop_dilation_ratio, context_frames, context_overlap, cfg, steps, sample_rate, fps, device):
+
         final_output_path = process_video(
             uploaded_img, uploaded_audio, width, height, length, seed, facemask_dilation_ratio, facecrop_dilation_ratio, context_frames, context_overlap, cfg, steps, sample_rate, fps, device
-        )
+        )        
+        output_video= final_output_path
         return final_output_path
 
     generate_button.click(
