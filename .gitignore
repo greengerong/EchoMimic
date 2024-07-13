@@ -3,3 +3,5 @@ pretrained_weights
 output
 __pycache__
 myenv
+dist
+build
