@@ -46,6 +46,8 @@ current_dir = os.getcwd()
 
 # ffmpeg_path = os.getenv('FFMPEG_PATH')
 ffmpeg_path = current_dir + "\ffmpeg"
+print(ffmpeg_path)
+
 if ffmpeg_path is None:
     print("please download ffmpeg-static and export to FFMPEG_PATH. \nFor example: export FFMPEG_PATH=/musetalk/ffmpeg-4.4-amd64-static")
 elif ffmpeg_path not in os.getenv('PATH'):
