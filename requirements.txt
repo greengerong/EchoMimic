@@ -15,4 +15,4 @@ opencv-python
 av==11.0.0
 gradio
 accelerate
-cv2
+opencv-python
