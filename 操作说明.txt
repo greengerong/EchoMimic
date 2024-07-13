@@ -1,4 +1,3 @@
-1：首次启动，首先运行run.bat(linux: run.sh)设置环境。
-2：后续启动，可继续运行run.bat(linux: run.sh) 或 python -u webui.py
+1：运行run.bat(linux: run.sh)设置环境。
 
 欢迎关注公众号破狼，获取更多AIGC内容。
