@@ -1,17 +1,24 @@
 #!/bin/bash
-# 使脚本可执行：`chmod +x init_env_linux.sh`
-# 在终端中运行该脚本：`./init_env_linux.sh`
+
+# Set character encoding to UTF-8
+export LANG=en_US.UTF-8
+
+# Check if virtual environment exists
+if [ -d "myenv" ]; then
+    echo "Virtual environment already exists, skipping creation"
+else
+    # Create virtual environment
+    python3 -m venv myenv
+fi
+
+# Activate virtual environment
+source myenv/bin/activate
 
 # Install dependencies
-echo "Installing dependencies..."
 pip install -r requirements.txt
 
-# Set environment variable for FFMPEG_PATH
-export FFMPEG_PATH="$(pwd)/ffmpeg-4.4-amd64-static"
-export PATH=$FFMPEG_PATH:$PATH
+# Execute Python script
+python -u app.py
 
-echo "FFMPEG_PATH is set to $FFMPEG_PATH"
-echo "Environment setup complete. You can now run your application."
-
-# 服务启动
-python -u webui.py
+# Pause (not typically used in Linux, but for consistency)
+read -p "Press any key to continue..."

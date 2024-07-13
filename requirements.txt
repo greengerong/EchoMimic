@@ -1,6 +1,6 @@
-torch>=2.0.1
-torchvision>=0.15.2
-torchaudio>=2.0.2
+torch
+torchvision
+torchaudio
 transformers>=4.38.2
 diffusers==0.24.0
 torchmetrics
@@ -14,3 +14,4 @@ omegaconf==2.3.0
 opencv-python
 av==11.0.0
 gradio
+accelerate

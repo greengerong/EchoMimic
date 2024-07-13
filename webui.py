@@ -42,7 +42,10 @@ default_values = {
     "device": "cuda"
 }
 
-ffmpeg_path = os.getenv('FFMPEG_PATH')
+current_dir = os.getcwd()
+
+# ffmpeg_path = os.getenv('FFMPEG_PATH')
+ffmpeg_path = current_dir + "\ffmpeg"
 if ffmpeg_path is None:
     print("please download ffmpeg-static and export to FFMPEG_PATH. \nFor example: export FFMPEG_PATH=/musetalk/ffmpeg-4.4-amd64-static")
 elif ffmpeg_path not in os.getenv('PATH'):
@@ -138,6 +141,9 @@ def select_face(det_bboxes, probs):
     return sorted_bboxes[0]
 
 def process_video(uploaded_img, uploaded_audio, width, height, length, seed, facemask_dilation_ratio, facecrop_dilation_ratio, context_frames, context_overlap, cfg, steps, sample_rate, fps, device):
+    print("processing video...")
+    print(uploaded_img)
+    print(uploaded_audio)
 
     if seed is not None and seed > -1:
         generator = torch.manual_seed(seed)
@@ -257,4 +263,6 @@ with gr.Blocks() as demo:
         outputs=output_video
     )
 
-demo.launch(inbrowser=True)
+
+def main():
+    demo.launch(inbrowser=True)

@@ -1,16 +1,21 @@
 @echo off
-:: 双击运行该批处理文件，或在命令提示符中导航到文件所在目录并运行 init_env_windows.bat
+chcp 65001
 
-:: Install dependencies
-echo "Installing dependencies..."
-pip install -r requirements.txt
+REM check env
+if exist myenv (
+    echo skip myenv
+) else (
+    REM create myenv
+    python -m venv myenv
+)
 
-:: Set environment variable for FFMPEG_PATH
-set "FFMPEG_PATH=%cd%\ffmpeg-4.4-amd64-static"
-set PATH=%FFMPEG_PATH%;%PATH%
+REM activate myenv
+call .\myenv\Scripts\activate
 
-echo "FFMPEG_PATH is set to %FFMPEG_PATH%"
-echo "Environment setup complete. You can now run your application."
+REM install requirements
+call .\myenv\Scripts\pip.exe install -r .\requirements.txt
 
-:: 服务启动
-python -u webui.py
+REM run app
+call .\myenv\Scripts\python.exe -u .\app.py
+
+pause
